@@ -119,5 +119,6 @@ public void onUpdated(PlayerAppearanceUpdatedEvent event) {
 | %midnightskins_original_skin_signedBase64% | Returns the Signed Base64 value of the skin the player logged in with. |
 | %midnightskins_original_skin_uuid% | Returns the UUID of the skin the player logged in with. |
 
-##### Troubleshooting
-If two plugins use this library with different versions, it can cause conflicts. In such a case, download the latest 'standalone' version from the releases tab.
+## Troubleshooting
+
+If two plugins use this library with different versions, it can cause conflicts. In such a case, download the latest 'standalone' version from the releases tab and install  it as a plugin on your server.

@@ -22,7 +22,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.*;
 
-public class Updater_1_8_0 implements Updater {
+public class Updater_v1_8_R1 implements Updater {
 
     // CraftBukkit classes
     private final Class<?> craftPlayer;
@@ -92,7 +92,7 @@ public class Updater_1_8_0 implements Updater {
 
     private boolean loaded = false;
 
-    public Updater_1_8_0() {
+    public Updater_v1_8_R1() {
 
         craftPlayer = ReflectionUtil.getCBClass("entity.CraftPlayer");
         craftItemStack = ReflectionUtil.getCBClass("inventory.CraftItemStack");
@@ -219,7 +219,7 @@ public class Updater_1_8_0 implements Updater {
                 public void run() {
                     Bukkit.getPluginManager().callEvent(event);
                 }
-            }.runTask(MidnightSkins.getInstance().plugin);
+            }.runTask(MidnightSkins.getInstance().getPlugin());
         }
 
     }

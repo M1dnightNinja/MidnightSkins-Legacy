@@ -22,7 +22,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.*;
 
-public class Updater_1_9_X implements Updater {
+public class Updater_v1_8_RX implements Updater {
 
     // CraftBukkit classes
     private final Class<?> craftPlayer;
@@ -40,7 +40,6 @@ public class Updater_1_9_X implements Updater {
     // NMS Enums
     private final Class<?> enumGamemode;
     private final Class<?> enumDifficulty;
-    private final Class<?> enumItemSlot;
     private final Class<?> enumPlayerInfoAction;
 
     // NMS Packet Classes
@@ -87,7 +86,7 @@ public class Updater_1_9_X implements Updater {
 
     private boolean loaded = false;
 
-    public Updater_1_9_X() {
+    public Updater_v1_8_RX() {
 
         craftPlayer = ReflectionUtil.getCBClass("entity.CraftPlayer");
         craftItemStack = ReflectionUtil.getCBClass("inventory.CraftItemStack");
@@ -102,7 +101,6 @@ public class Updater_1_9_X implements Updater {
 
         enumGamemode = ReflectionUtil.getNMSClass("WorldSettings$EnumGamemode");
         enumDifficulty = ReflectionUtil.getNMSClass("EnumDifficulty");
-        enumItemSlot = ReflectionUtil.getNMSClass("EnumItemSlot");
         enumPlayerInfoAction = ReflectionUtil.getNMSClass("PacketPlayOutPlayerInfo$EnumPlayerInfoAction");
 
         namedEntitySpawnPacket = ReflectionUtil.getNMSClass("PacketPlayOutNamedEntitySpawn");
@@ -209,7 +207,7 @@ public class Updater_1_9_X implements Updater {
                 public void run() {
                     Bukkit.getPluginManager().callEvent(event);
                 }
-            }.runTask(MidnightSkins.getInstance().plugin);
+            }.runTask(MidnightSkins.getInstance().getPlugin());
         }
 
     }
@@ -334,11 +332,10 @@ public class Updater_1_9_X implements Updater {
             }
         }
 
-        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, ReflectionUtil.getEnumValue(enumItemSlot, "MAINHAND"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getItemInMainHand()));
-        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, ReflectionUtil.getEnumValue(enumItemSlot, "OFFHAND"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getItemInOffHand()));
-        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, ReflectionUtil.getEnumValue(enumItemSlot, "FEET"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getBoots()));
-        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, ReflectionUtil.getEnumValue(enumItemSlot, "LEGS"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getLeggings()));
-        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, ReflectionUtil.getEnumValue(enumItemSlot, "CHEST"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getChestplate()));
-        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, ReflectionUtil.getEnumValue(enumItemSlot, "HEAD"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getHelmet()));
+        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, 0, ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getItemInHand()));
+        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, 1, ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getBoots()));
+        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, 2, ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getLeggings()));
+        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, 3, ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getChestplate()));
+        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, 4, ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getHelmet()));
     }
 }

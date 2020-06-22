@@ -7,8 +7,10 @@ import net.md_5.bungee.api.ChatColor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.*;
 import org.bukkit.plugin.*;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.*;
 
+import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.logging.Level;
 
@@ -19,13 +21,24 @@ public class MidnightSkins {
     private static final MidnightSkins INSTANCE = new MidnightSkins();
     private static Updater updater;
 
-    public Plugin plugin;
+    private JavaPlugin plugin;
+
+    private boolean forwarder = false;
 
     // Constructor
     private MidnightSkins() {
+
+        Class<?> cl = ReflectionUtil.getClass("me.m1dnightninja.midnightskins.standalone.MidnightSkins");
+        if(cl != null) {
+            log("MidnightSkins standalone jar detected! Using this API as a forwarder!");
+            forwarder = true;
+            enabled = true;
+            return;
+        }
+
         for (Plugin plugin : Bukkit.getPluginManager().getPlugins()) {
             if (this.getClass().getProtectionDomain().getCodeSource().equals(plugin.getClass().getProtectionDomain().getCodeSource())) {
-                this.plugin = plugin;
+                if(plugin instanceof JavaPlugin) this.plugin = (JavaPlugin) plugin;
             }
         }
     }
@@ -33,6 +46,10 @@ public class MidnightSkins {
     // Enable MidnightSkins, registering PlaceholderAPI placeholders.
     // This should be called by the plugin that's using it.
     public void enable() {
+        if(forwarder) {
+            StandaloneUtil.enable();
+            return;
+        }
         if(!enabled) {
             if(ReflectionUtil.getMajorVersion() < 8) {
                 // Setting skins was username based before 1.8, this library is only built to support the 1.8+ UUID system
@@ -44,21 +61,24 @@ public class MidnightSkins {
                 Bukkit.getPluginManager().registerEvents(new MainListener(), plugin);
                 String api = ReflectionUtil.getAPIVersion();
                 log("Attempting to enable MidnightSkins with API version " + api);
-                switch(api) {
-                    case "v1_8_R1":
-                        updater = new Updater_1_8_0();
-                        break;
-                    case "v1_8_R2":
-                    case "v1_8_R3":
-                        updater = new Updater_1_8_X();
-                        break;
-                    case "v1_9_R1":
-                    case "v1_9_R2":
-                        updater = new Updater_1_9_X();
-                        break;
-                    default:
-                        updater = new Updater_Other();
+
+                Class<?> updateTmp = ReflectionUtil.getClass("me.m1dnightninja.midnightskins.updater.Updater_" + api);
+                if(updateTmp == null) {
+                    String ap = api.substring(0, api.length()-1);
+                    updateTmp = ReflectionUtil.getClass("me.m1dnightninja.midnightskins.updater.Updater_" + ap + "X");
                 }
+
+                if(updateTmp != null) {
+                    Constructor<?> cons = ReflectionUtil.getConstructor(updateTmp);
+                    if(cons != null) {
+                        updater = (Updater) ReflectionUtil.construct(cons);
+                    }
+                }
+
+                if(updater == null) {
+                    updater = new Updater_Other();
+                }
+
                 if(updater.isLoaded()) {
                     enabled = true;
                     log("MidnightSkins enabled with API version " + api + ", Game version 1." + ReflectionUtil.getMajorVersion());
@@ -72,6 +92,10 @@ public class MidnightSkins {
     // Disable MidnightSkins
     // Calling this will disable the library, making all the functions non-functional
     public void disable() {
+        if(forwarder) {
+            StandaloneUtil.disable();
+            return;
+        }
         if(enabled) {
             enabled = false;
 
@@ -83,6 +107,9 @@ public class MidnightSkins {
 
     // Check if the Library is enabled
     public boolean isEnabled() {
+        if(forwarder) {
+            return StandaloneUtil.isEnabled();
+        }
         return enabled;
     }
 
@@ -106,8 +133,19 @@ public class MidnightSkins {
         return INSTANCE;
     }
 
+    public JavaPlugin getPlugin() {
+        if(forwarder) {
+            return StandaloneUtil.getInstance();
+        }
+        return plugin;
+    }
+
     // Sets the given player's skin to the values stored within the skin object. This method does not update the player's skin for the other players.
     public void setPlayerSkin(Player p, Skin s) {
+        if(forwarder) {
+            StandaloneUtil.setPlayerSkin(p, s);
+            return;
+        }
         if(!enabled) return;
         if(Bukkit.isPrimaryThread()) {
             PlayerData.getPlayerData(p).setCustomSkin(s);
@@ -123,6 +161,10 @@ public class MidnightSkins {
 
     // Resets the given player's skin to default. This method does not update the player's skin for other players.
     public void resetPlayerSkin(Player p) {
+        if(forwarder) {
+            StandaloneUtil.resetPlayerSkin(p);
+            return;
+        }
         if (!enabled) return;
         if(Bukkit.isPrimaryThread()) {
             PlayerData.getPlayerData(p).setCustomSkin(PlayerData.getPlayerData(p).getNormalSkin());
@@ -138,6 +180,10 @@ public class MidnightSkins {
 
     // Sets a player's name to the given text. This method does not update the player's name for other players.
     public void setPlayerName(Player p, final String name) {
+        if(forwarder) {
+            StandaloneUtil.setPlayerName(p, name);
+            return;
+        }
         if(!enabled) return;
         if(Bukkit.isPrimaryThread()) {
             PlayerData.getPlayerData(p).setCustomName(name);
@@ -154,6 +200,10 @@ public class MidnightSkins {
 
     // Resets a player's name to default.
     public void resetPlayerName(Player p) {
+        if(forwarder) {
+            StandaloneUtil.resetPlayerName(p);
+            return;
+        }
         if (!enabled) return;
         if (Bukkit.isPrimaryThread()) {
             PlayerData.getPlayerData(p).setCustomName(PlayerData.getPlayerData(p).getNormalName());
@@ -169,6 +219,10 @@ public class MidnightSkins {
 
     // Resets a player's name and skin
     public void resetPlayer(Player p) {
+        if(forwarder) {
+            StandaloneUtil.resetPlayer(p);
+            return;
+        }
         if(!enabled) return;
         resetPlayerName(p);
         resetPlayerSkin(p);
@@ -176,6 +230,10 @@ public class MidnightSkins {
 
     // Update a player's skin and name for all other players on the server.
     public void updatePlayer(Player p) {
+        if(forwarder) {
+            StandaloneUtil.updatePlayer(p);
+            return;
+        }
         if(!enabled) return;
         if(Bukkit.isPrimaryThread()) {
             updater.updatePlayer(p);
@@ -192,6 +250,10 @@ public class MidnightSkins {
 
     // Update a player's skin and name for another player on the server.
     public void updatePlayer(Player p, Player o) {
+        if(forwarder) {
+            StandaloneUtil.updatePlayer(p, o);
+            return;
+        }
         if(!enabled) return;
         if(Bukkit.isPrimaryThread()) {
             updater.updatePlayerOther(p,o);
@@ -208,35 +270,49 @@ public class MidnightSkins {
 
     // Returns the skin data for a player's currently applied skin.
     public Skin getCurrentSkin(Player p) {
+        if(forwarder) {
+            return StandaloneUtil.getCurrentSkin(p);
+        }
         if(!enabled) return null;
         return PlayerData.getPlayerData(p).getCustomSkin() == null ? PlayerData.getPlayerData(p).getNormalSkin() : PlayerData.getPlayerData(p).getCustomSkin();
     }
 
     // Returns the skin data for a player's skin they logged in with.
     public Skin getOriginalSkin(Player p) {
+        if(forwarder) {
+            return StandaloneUtil.getOriginalSkin(p);
+        }
         if(!enabled) return null;
         return PlayerData.getPlayerData(p).getNormalSkin();
     }
 
     // Returns the currently applied name of a player
     public String getCurrentName(Player p) {
+        if(forwarder) {
+            return StandaloneUtil.getCurrentName(p);
+        }
         if(!enabled) return null;
         return PlayerData.getPlayerData(p).getCustomName() == null ? PlayerData.getPlayerData(p).getNormalName() : PlayerData.getPlayerData(p).getCustomName();
     }
 
     // Returns the name that a player logged in with
     public String getOriginalName(Player p) {
+        if(forwarder) {
+            return StandaloneUtil.getOriginalName(p);
+        }
         if(!enabled) return null;
         return PlayerData.getPlayerData(p).getNormalName();
     }
 
     // Returns the skin data of a player using Mojang's server
     public Skin getSkinFromWeb(UUID u) {
+        if(forwarder) {
+            return StandaloneUtil.getSkinFromWeb(u);
+        }
         MojangUtil.SkinData d = MojangUtil.getSkin(u);
         if(d != null) {
             return new Skin(d.uuid, d.base64, d.signedBase64);
         }
         return null;
     }
-
 }

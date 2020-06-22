@@ -12,13 +12,13 @@ import java.util.*;
 
 public class PlayerData {
 
-    private Player player;
+    private final Player player;
     private final GameProfile originalProfile;
     private GameProfile customProfile;
 
     private UUID customSkinUUID = null;
 
-    private static List<PlayerData> data = new ArrayList<>();
+    private static final List<PlayerData> data = new ArrayList<>();
 
     PlayerData(Player player) {
         this.player = player;
@@ -61,7 +61,7 @@ public class PlayerData {
 
         if (!event.isCancelled()) {
             if (customProfile == null) {
-                customProfile = new GameProfile(player.getUniqueId(), player == null ? originalProfile.getName() : Bukkit.getOfflinePlayer(player.getUniqueId()).getName());
+                customProfile = new GameProfile(player.getUniqueId(), getGameProfile().getName());
             }
             SkinUtil.setSkin(customProfile, customSkin);
             if(customSkin == null) {

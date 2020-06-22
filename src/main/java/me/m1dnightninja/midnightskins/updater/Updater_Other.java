@@ -38,6 +38,7 @@ public class Updater_Other implements Updater {
 
     // NMS Enums
     private final Class<?> enumGamemode;
+    private final Class<?> enumDifficulty;
     private final Class<?> enumItemSlot;
     private final Class<?> enumPlayerInfoAction;
 
@@ -103,7 +104,8 @@ public class Updater_Other implements Updater {
         dataWatcher = ReflectionUtil.getNMSClass("DataWatcher");
         Class<?> dimensionManager = ReflectionUtil.getNMSClass("DimensionManager");
 
-        enumGamemode = ReflectionUtil.getNMSClass("EnumGamemode");
+        enumGamemode = ReflectionUtil.getMajorVersion() < 10 ? ReflectionUtil.getNMSClass("WorldSettings$EnumGamemode") : ReflectionUtil.getNMSClass("EnumGamemode");
+        enumDifficulty = ReflectionUtil.getNMSClass("EnumDifficulty");
         enumItemSlot = ReflectionUtil.getNMSClass("EnumItemSlot");
         enumPlayerInfoAction = ReflectionUtil.getNMSClass("PacketPlayOutPlayerInfo$EnumPlayerInfoAction");
 
@@ -162,8 +164,12 @@ public class Updater_Other implements Updater {
 
         if(ReflectionUtil.getMajorVersion() >= 15) {
             playerRespawnConstructor = ReflectionUtil.getConstructor(respawnPacket, dimensionManager, long.class, worldType, enumGamemode);
-        } else {
+        } else if(ReflectionUtil.getMajorVersion() == 14) {
             playerRespawnConstructor = ReflectionUtil.getConstructor(respawnPacket, dimensionManager, worldType, enumGamemode);
+        } else if(ReflectionUtil.getMajorVersion() == 13) {
+            playerRespawnConstructor = ReflectionUtil.getConstructor(respawnPacket, dimensionManager, enumDifficulty, worldType, enumGamemode);
+        } else {
+            playerRespawnConstructor = ReflectionUtil.getConstructor(respawnPacket, int.class, enumDifficulty, worldType, enumGamemode);
         }
         playerInfoConstructor = ReflectionUtil.getConstructor(playerInfoPacket);
         infoDataConstructor = ReflectionUtil.getConstructor(playerInfoData, playerInfoPacket, GameProfile.class, int.class, enumGamemode, iChatBaseComponent);
@@ -214,7 +220,7 @@ public class Updater_Other implements Updater {
                 public void run() {
                     Bukkit.getPluginManager().callEvent(event);
                 }
-            }.runTask(MidnightSkins.getInstance().plugin);
+            }.runTask(MidnightSkins.getInstance().getPlugin());
         }
 
     }
@@ -258,8 +264,16 @@ public class Updater_Other implements Updater {
                 ex.printStackTrace();
             }
             PacketUtil.sendPacket(p, playerRespawnConstructor, ReflectionUtil.callMethod(wprovider, getDimensionManager), hash, ReflectionUtil.callMethod(wdata, getWorldType), ReflectionUtil.getEnumValue(enumGamemode, p.getGameMode().name()));
-        } else {
+        } else if(ReflectionUtil.getMajorVersion() == 14 ) {
             PacketUtil.sendPacket(p, playerRespawnConstructor, ReflectionUtil.callMethod(wprovider, getDimensionManager), ReflectionUtil.callMethod(wdata, getWorldType), ReflectionUtil.getEnumValue(enumGamemode, p.getGameMode().name()));
+        } else if(ReflectionUtil.getMajorVersion() == 13) {
+            PacketUtil.sendPacket(p, playerRespawnConstructor, ReflectionUtil.callMethod(wprovider, getDimensionManager), ReflectionUtil.getEnumValue(enumDifficulty, w.getDifficulty().name()), ReflectionUtil.callMethod(wdata, getWorldType), ReflectionUtil.getEnumValue(enumGamemode, p.getGameMode().name()));
+        } else {
+            int type = 0;
+            if(w.getEnvironment() == World.Environment.NETHER) type = 1;
+            if(w.getEnvironment() == World.Environment.THE_END) type = 2;
+
+            PacketUtil.sendPacket(p, playerRespawnConstructor, type, ReflectionUtil.getEnumValue(enumDifficulty, w.getDifficulty().name()), ReflectionUtil.callMethod(wdata, getWorldType), ReflectionUtil.getEnumValue(enumGamemode, p.getGameMode().name()));
         }
         PacketUtil.sendPacket(p, ReflectionUtil.getConstructor(positionPacket, double.class, double.class, double.class, float.class, float.class, Set.class, int.class), p.getLocation().getX(), p.getLocation().getY(), p.getLocation().getZ(), p.getLocation().getYaw(), p.getLocation().getPitch(), new HashSet<>(), 0);
         PacketUtil.sendPacket(p, ReflectionUtil.getConstructor(heldItemPacket, int.class), p.getInventory().getHeldItemSlot());

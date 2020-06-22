@@ -1,12 +1,15 @@
 package me.m1dnightninja.midnightskins.util;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import me.m1dnightninja.midnightskins.MidnightSkins;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.json.simple.*;
-import org.json.simple.parser.*;
 
 import java.io.*;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.logging.Level;
 
@@ -22,12 +25,16 @@ public class MojangUtil {
 
             HttpResponse res = makeHTTPRequest(prof);
             if(res.successful && res.code == 200) {
-                JSONParser parser = new JSONParser();
-                JSONObject o = (JSONObject) parser.parse(res.response);
-                String id = (String)o.get("id");
+                JsonParser parser = new JsonParser();
+                JsonObject object = parser.parse(res.response).getAsJsonObject();
+                
+                String id = object.get("id").getAsString();
+                
                 return UUID.fromString(id.substring(0,8) + "-" + id.substring(8,12) + "-" + id.substring(12,16) + "-" + id.substring(16,20) + "-" + id.substring(20));
             }
-        } catch(MalformedURLException | ParseException ex) {}
+        } catch(MalformedURLException | IllegalStateException ignored) {
+            // Invalid URL
+        }
         return null;
     }
 
@@ -38,7 +45,7 @@ public class MojangUtil {
             public void run() {
                 callback.callback(getUUID(name), null);
             }
-        }.runTaskAsynchronously(MidnightSkins.getInstance().plugin);
+        }.runTaskAsynchronously(MidnightSkins.getInstance().getPlugin());
     }
 
     // Returns Skin Data of a Player from Mojang's servers. Will return null if Mojang's servers cannot be accessed.
@@ -47,32 +54,11 @@ public class MojangUtil {
             URL prof = new URL(SKIN_URL+player.toString().replace("-","") +"?unsigned=false");
 
             HttpResponse res = makeHTTPRequest(prof);
-            if(res.successful && res.code == 200) {
-                String base64 = null;
-                String signedBase64 = null;
+            return getSkinData(res, player);
 
-
-                JSONParser parser = new JSONParser();
-                JSONObject o = (JSONObject) parser.parse(res.response);
-                JSONArray properties = (JSONArray) o.get("properties");
-                for(JSONObject key  : (List<JSONObject>) properties) {
-                    if(key.get("name").equals("textures")) {
-                        base64 = (String) key.get("value");
-                        signedBase64 = (String) key.get("signature");
-                    }
-                }
-                if(base64 == null) return null;
-                JSONObject b64 = (JSONObject) parser.parse(new String(Base64.getDecoder().decode(base64), "UTF-8"));
-                String name = (String) b64.get("profileName");
-                JSONObject textures = (JSONObject) b64.get("textures");
-                String skUrl = null;
-                String cpUrl = null;
-                if(textures.containsKey("SKIN")) skUrl = (String)((JSONObject)textures.get("SKIN")).get("url");
-                if(textures.containsKey("CAPE")) cpUrl = (String)((JSONObject)textures.get("CAPE")).get("url");
-
-                return new SkinData(name,player,base64,signedBase64,skUrl,cpUrl);
-            }
-        } catch(MalformedURLException | ParseException | UnsupportedEncodingException ex) {}
+        } catch(MalformedURLException ex) {
+            MidnightSkins.log("Failed to get skin data from Mojang's Servers!", Level.WARNING);
+        }
         return null;
     }
 
@@ -81,41 +67,13 @@ public class MojangUtil {
         new BukkitRunnable() {
             @Override
             public void run() {
-                try {
-                    URL prof = new URL(SKIN_URL+player.toString().replace("-","") +"?unsigned=false");
 
-                    HttpResponse res = makeHTTPRequest(prof);
-                    if(res.successful && res.code == 200) {
-                        String base64 = null;
-                        String signedBase64 = null;
+                SkinData data = getSkin(player);
+                if(data == null) return;
 
-
-                        JSONParser parser = new JSONParser();
-                        JSONObject o = (JSONObject) parser.parse(res.response);
-                        JSONArray properties = (JSONArray) o.get("properties");
-                        for(JSONObject key  : (List<JSONObject>) properties) {
-                            if(key.get("name").equals("textures")) {
-                                base64 = (String) key.get("value");
-                                signedBase64 = (String) key.get("signature");
-                            }
-                        }
-                        if(base64 == null) return;
-                        JSONObject b64 = (JSONObject) parser.parse(new String(Base64.getDecoder().decode(base64), "UTF-8"));
-                        String name = (String) b64.get("profileName");
-                        JSONObject textures = (JSONObject) b64.get("textures");
-                        String skUrl = null;
-                        String cpUrl = null;
-                        if(textures.containsKey("SKIN")) skUrl = (String)((JSONObject)textures.get("SKIN")).get("url");
-                        if(textures.containsKey("CAPE")) cpUrl = (String)((JSONObject)textures.get("CAPE")).get("url");
-
-                        callback.callback(player, new SkinData(name,player,base64,signedBase64,skUrl,cpUrl));
-                    }
-                } catch(MalformedURLException | ParseException | UnsupportedEncodingException ex) {
-                    MidnightSkins.log("Failed to get skin data from Mojang's Servers!", Level.WARNING);
-                    return;
-                }
+                callback.callback(player, data);
             }
-        }.runTaskAsynchronously(MidnightSkins.getInstance().plugin);
+        }.runTaskAsynchronously(MidnightSkins.getInstance().getPlugin());
     }
 
     // Makes an HTTP Request to the given URL
@@ -130,8 +88,53 @@ public class MojangUtil {
                 res.append(line);
             }
             return new HttpResponse(res.toString(), con.getResponseCode(), true);
-        } catch(IOException ex) { }
+        } catch(IOException ignored) { }
         return new HttpResponse(null, 400, false);
+    }
+
+    private static SkinData getSkinData(HttpResponse response, UUID uuid) {
+        if(!response.successful || response.code != 200) return null;
+        try {
+            String base64 = null;
+            String signedBase64 = null;
+
+            JsonParser parser = new JsonParser();
+            JsonObject o = parser.parse(response.response).getAsJsonObject();
+
+            JsonArray properties = o.getAsJsonArray("properties");
+
+            for (int i = 0; i < properties.size(); i++) {
+                JsonElement element = properties.get(i);
+                try {
+                    JsonObject object = element.getAsJsonObject();
+                    if (object.get("name").getAsString().equals("textures")) {
+                        base64 = object.get("value").getAsString();
+                        signedBase64 = object.get("signature").getAsString();
+                    }
+                } catch (IllegalStateException ignored) {
+                }
+            }
+
+            if (base64 == null) return null;
+
+            JsonObject b64 = parser.parse(new String(Base64.getDecoder().decode(base64), StandardCharsets.UTF_8)).getAsJsonObject();
+            String name = b64.get("profileName").getAsString();
+
+            JsonObject textures = b64.get("textures").getAsJsonObject();
+            String skUrl = null;
+            String cpUrl = null;
+
+            JsonElement skin = textures.get("SKIN");
+            if (skin != null) skUrl = skin.getAsJsonObject().get("url").getAsString();
+
+            JsonElement cape = textures.get("CAPE");
+            if (cape != null) cpUrl = cape.getAsJsonObject().get("url").getAsString();
+
+            return new SkinData(name, uuid, base64, signedBase64, skUrl, cpUrl);
+
+        } catch(IllegalStateException ignored) { }
+
+        return null;
     }
 
     // Class that contains data of a response to an HTTP Request

@@ -20,7 +20,7 @@ public class MainListener implements Listener {
                     MidnightSkins.getInstance().updatePlayer(p, event.getPlayer());
                 }
             }
-        }.runTask(MidnightSkins.getInstance().plugin);
+        }.runTask(MidnightSkins.getInstance().getPlugin());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -30,6 +30,6 @@ public class MainListener implements Listener {
             public void run() {
                 PlayerData.purge(event.getPlayer());
             }
-        }.runTask(MidnightSkins.getInstance().plugin);
+        }.runTask(MidnightSkins.getInstance().getPlugin());
     }
 }

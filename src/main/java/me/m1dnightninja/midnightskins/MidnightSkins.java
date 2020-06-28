@@ -62,22 +62,30 @@ public class MidnightSkins {
                 String api = ReflectionUtil.getAPIVersion();
                 log("Attempting to enable MidnightSkins with API version " + api);
 
-                Class<?> updateTmp = ReflectionUtil.getClass("me.m1dnightninja.midnightskins.updater.Updater_" + api);
-                if(updateTmp == null) {
-                    String ap = api.substring(0, api.length()-1);
-                    updateTmp = ReflectionUtil.getClass("me.m1dnightninja.midnightskins.updater.Updater_" + ap + "X");
-                }
-
-                if(updateTmp != null) {
-                    Constructor<?> cons = ReflectionUtil.getConstructor(updateTmp);
-                    if(cons != null) {
-                        updater = (Updater) ReflectionUtil.construct(cons);
+                if(api.equals("v1_8_R1")) {
+                    updater = new Updater_v8R1();
+                } else {
+                    int majorVersion = ReflectionUtil.getMajorVersion();
+                    if(majorVersion == 8) {
+                        updater = new Updater_v8RX();
+                    } else if(majorVersion < 16) {
+                        updater = new Updater_v9RX_15RX();
+                    } else {
+                        try {
+                            Class<?> upd = Class.forName("me.m1dnightninja.midnightskins.updater.Updater_v" + majorVersion + api.substring(api.length()-2));
+                            Constructor<?> cons = ReflectionUtil.getConstructor(upd);
+                            if(cons != null) updater = (Updater) ReflectionUtil.construct(cons);
+                        } catch(NullPointerException | ClassCastException ignored) { } catch(ClassNotFoundException ex) {
+                            try {
+                                Class<?> upd = Class.forName("me.m1dnightninja.midnightskins.updater.Updater_v" + majorVersion + "RX");
+                                Constructor<?> cons = ReflectionUtil.getConstructor(upd);
+                                if(cons != null) updater = (Updater) ReflectionUtil.construct(cons);
+                            } catch (NullPointerException | ClassCastException | ClassNotFoundException ignored) { }
+                        }
                     }
                 }
 
-                if(updater == null) {
-                    updater = new Updater_Other();
-                }
+                if(updater == null) updater = new Updater_Other();
 
                 if(updater.isLoaded()) {
                     enabled = true;

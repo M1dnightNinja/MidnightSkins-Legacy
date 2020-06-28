@@ -1,17 +1,22 @@
 package me.m1dnightninja.midnightskins.updater;
 
-import com.mojang.authlib.*;
+import com.mojang.authlib.GameProfile;
+import com.mojang.datafixers.util.Pair;
 import me.m1dnightninja.midnightskins.MidnightSkins;
 import me.m1dnightninja.midnightskins.PlayerData;
-import me.m1dnightninja.midnightskins.api.*;
-import me.m1dnightninja.midnightskins.util.*;
-import org.bukkit.*;
+import me.m1dnightninja.midnightskins.api.PlayerAppearanceUpdatedEvent;
+import me.m1dnightninja.midnightskins.util.NameUtil;
+import me.m1dnightninja.midnightskins.util.PacketUtil;
+import me.m1dnightninja.midnightskins.util.ReflectionUtil;
+import me.m1dnightninja.midnightskins.util.SkinUtil;
+import org.bukkit.Bukkit;
 import org.bukkit.World;
-import org.bukkit.entity.*;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scoreboard.*;
 import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.ScoreboardManager;
+import org.bukkit.scoreboard.Team;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -26,19 +31,17 @@ public class Updater_Other implements Updater {
     // CraftBukkit classes
     private final Class<?> craftPlayer;
     private final Class<?> craftItemStack;
-    private final Class<?> craftWorld;
     private final Class<?> craftScoreboard;
+    private final Class<?> craftWorld;
 
     // NMS Classes
     private final Class<?> entityHuman;
     private final Class<?> entity;
 
-    private final Class<?> worldServer;
     private final Class<?> dataWatcher;
 
     // NMS Enums
     private final Class<?> enumGamemode;
-    private final Class<?> enumDifficulty;
     private final Class<?> enumItemSlot;
     private final Class<?> enumPlayerInfoAction;
 
@@ -55,13 +58,9 @@ public class Updater_Other implements Updater {
     private Method getPlayerId;
     private Method getPlayerHandle;
     private Method getHeadRotation;
-
-    private Method getWorldHandle;
-    private Method getWorldData;
-    private Method getDimensionManager;
-    private Method getWorldType;
     private Method getDataWatcher;
 
+    private Method getWorldHandle;
     private Method updateAbilities;
     private Method triggerHealthUpdate;
     private Method updateInventory;
@@ -72,11 +71,12 @@ public class Updater_Other implements Updater {
     private Method getTeam;
 
     // Fields
-    private Field getWorldProvider;
     private Field defaultContainer;
     private Field action;
     private Field list;
     private Field ids;
+    private Field typeKey;
+    private Field dimensionKey;
 
     // Constructors
     private Constructor<?> playerRespawnConstructor;
@@ -99,16 +99,16 @@ public class Updater_Other implements Updater {
         entityHuman = ReflectionUtil.getNMSClass("EntityHuman");
         entity = ReflectionUtil.getNMSClass("Entity");
 
-        Class<?> worldType = ReflectionUtil.getNMSClass("WorldType");
-        worldServer = ReflectionUtil.getNMSClass("WorldServer");
+        Class<?> world = ReflectionUtil.getNMSClass("World");
+        Class<?> worldServer = ReflectionUtil.getNMSClass("WorldServer");
         dataWatcher = ReflectionUtil.getNMSClass("DataWatcher");
         Class<?> dimensionManager = ReflectionUtil.getNMSClass("DimensionManager");
 
-        enumGamemode = ReflectionUtil.getMajorVersion() < 10 ? ReflectionUtil.getNMSClass("WorldSettings$EnumGamemode") : ReflectionUtil.getNMSClass("EnumGamemode");
-        enumDifficulty = ReflectionUtil.getNMSClass("EnumDifficulty");
+        enumGamemode = ReflectionUtil.getNMSClass("EnumGamemode");
         enumItemSlot = ReflectionUtil.getNMSClass("EnumItemSlot");
         enumPlayerInfoAction = ReflectionUtil.getNMSClass("PacketPlayOutPlayerInfo$EnumPlayerInfoAction");
 
+        // Packets
         namedEntitySpawnPacket = ReflectionUtil.getNMSClass("PacketPlayOutNamedEntitySpawn");
         Class<?> respawnPacket = ReflectionUtil.getNMSClass("PacketPlayOutRespawn");
         positionPacket = ReflectionUtil.getNMSClass("PacketPlayOutPosition");
@@ -116,11 +116,11 @@ public class Updater_Other implements Updater {
         entityMetaPacket = ReflectionUtil.getNMSClass("PacketPlayOutEntityMetadata");
         entityStatusPacket = ReflectionUtil.getNMSClass("PacketPlayOutEntityStatus");
         headRotationPacket = ReflectionUtil.getNMSClass("PacketPlayOutEntityHeadRotation");
-
         Class<?> playerInfoPacket = ReflectionUtil.getNMSClass("PacketPlayOutPlayerInfo");
         Class<?> entityDestroyPacket = ReflectionUtil.getNMSClass("PacketPlayOutEntityDestroy");
         Class<?> entityEquipmentPacket = ReflectionUtil.getNMSClass("PacketPlayOutEntityEquipment");
         Class<?> scoreboardPacket = ReflectionUtil.getNMSClass("PacketPlayOutScoreboardTeam");
+
         Class<?> itemStack = ReflectionUtil.getNMSClass("ItemStack");
         Class<?> playerInfoData = ReflectionUtil.getNMSClass("PacketPlayOutPlayerInfo$PlayerInfoData");
         Class<?> container = ReflectionUtil.getNMSClass("Container");
@@ -128,28 +128,21 @@ public class Updater_Other implements Updater {
         Class<?> chatComponent = ReflectionUtil.getNMSClass("ChatComponentText");
         Class<?> scoreboard = ReflectionUtil.getNMSClass("Scoreboard");
         Class<?> scoreboardTeam = ReflectionUtil.getNMSClass("ScoreboardTeam");
-        Class<?> world = ReflectionUtil.getNMSClass("World");
-        Class<?> worldProvider = ReflectionUtil.getNMSClass("WorldProvider");
         Class<?> worldData = ReflectionUtil.getNMSClass("WorldData");
         Class<?> entityLiving = ReflectionUtil.getNMSClass("EntityLiving");
         Class<?> entityPlayer = ReflectionUtil.getNMSClass("EntityPlayer");
 
+        Class<?> resourceKey = ReflectionUtil.getNMSClass("ResourceKey");
+
         if(craftPlayer == null || craftItemStack == null || craftWorld == null || craftScoreboard == null || entityPlayer == null || entityHuman == null || entityLiving == null || entity == null || itemStack == null || playerInfoData == null || container == null
-            || iChatBaseComponent == null || chatComponent == null || scoreboard == null || scoreboardTeam == null || world == null || worldData == null || worldType == null || worldServer == null || dataWatcher == null || worldProvider == null || (ReflectionUtil.getMajorVersion() > 8 && dimensionManager == null)
-            || enumGamemode == null || (ReflectionUtil.getMajorVersion() > 8 && enumItemSlot == null) || enumPlayerInfoAction == null || playerInfoPacket == null || entityDestroyPacket == null || namedEntitySpawnPacket == null || respawnPacket == null || positionPacket == null || heldItemPacket == null
-            || entityMetaPacket == null || entityStatusPacket == null || entityEquipmentPacket == null || scoreboardPacket == null) {
+            || iChatBaseComponent == null || chatComponent == null || scoreboard == null || scoreboardTeam == null || world == null || worldData == null || worldServer == null || dataWatcher == null || dimensionManager == null
+            || enumGamemode == null || enumItemSlot == null || enumPlayerInfoAction == null || playerInfoPacket == null || entityDestroyPacket == null || namedEntitySpawnPacket == null || respawnPacket == null || positionPacket == null || heldItemPacket == null
+            || entityMetaPacket == null || entityStatusPacket == null || entityEquipmentPacket == null || scoreboardPacket == null || resourceKey == null) {
             return;
         }
 
         getPlayerId = ReflectionUtil.getMethod(entityPlayer, "getId");
         getPlayerHandle = ReflectionUtil.getMethod(craftPlayer, "getHandle");
-
-        getWorldHandle = ReflectionUtil.getMethod(craftWorld, "getHandle");
-        getWorldData = ReflectionUtil.getMethod(world, "getWorldData");
-
-        getDimensionManager = ReflectionUtil.getMethod(worldProvider, "getDimensionManager");
-        getWorldType = ReflectionUtil.getMethod(worldData, "getType");
-
         getHeadRotation = ReflectionUtil.getMethod(entityLiving, "getHeadRotation");
 
         getDataWatcher = ReflectionUtil.getMethod(entity, "getDataWatcher");
@@ -162,31 +155,27 @@ public class Updater_Other implements Updater {
         getTeam = ReflectionUtil.getMethod(scoreboard, "getTeam", String.class);
         asNMSCopy = ReflectionUtil.getMethod(craftItemStack, "asNMSCopy", ItemStack.class);
 
-        if(ReflectionUtil.getMajorVersion() >= 15) {
-            playerRespawnConstructor = ReflectionUtil.getConstructor(respawnPacket, dimensionManager, long.class, worldType, enumGamemode);
-        } else if(ReflectionUtil.getMajorVersion() == 14) {
-            playerRespawnConstructor = ReflectionUtil.getConstructor(respawnPacket, dimensionManager, worldType, enumGamemode);
-        } else if(ReflectionUtil.getMajorVersion() == 13) {
-            playerRespawnConstructor = ReflectionUtil.getConstructor(respawnPacket, dimensionManager, enumDifficulty, worldType, enumGamemode);
-        } else {
-            playerRespawnConstructor = ReflectionUtil.getConstructor(respawnPacket, int.class, enumDifficulty, worldType, enumGamemode);
-        }
+        getWorldHandle = ReflectionUtil.getMethod(craftWorld, "getHandle");
+
+        playerRespawnConstructor = ReflectionUtil.getConstructor(respawnPacket, resourceKey, resourceKey, long.class, enumGamemode, enumGamemode, boolean.class, boolean.class, boolean.class);
         playerInfoConstructor = ReflectionUtil.getConstructor(playerInfoPacket);
         infoDataConstructor = ReflectionUtil.getConstructor(playerInfoData, playerInfoPacket, GameProfile.class, int.class, enumGamemode, iChatBaseComponent);
         chatComponentConstructor = ReflectionUtil.getConstructor(chatComponent, String.class);
         entityDestroyConstructor = ReflectionUtil.getConstructor(entityDestroyPacket);
         scoreboardConstructor = ReflectionUtil.getConstructor(scoreboardPacket, scoreboardTeam, Collection.class, int.class);
-        entityEquipmentConstructor = ReflectionUtil.getConstructor(entityEquipmentPacket, int.class, enumItemSlot, itemStack);
+        entityEquipmentConstructor = ReflectionUtil.getConstructor(entityEquipmentPacket, int.class, List.class);
 
         action = ReflectionUtil.getFieldByType(playerInfoPacket, enumPlayerInfoAction);
         list = ReflectionUtil.getFieldByType(playerInfoPacket, List.class);
         ids = ReflectionUtil.getFieldByType(entityDestroyPacket, int[].class);
-        getWorldProvider = ReflectionUtil.getField(world,"worldProvider");
-        defaultContainer = ReflectionUtil.getField(entityHuman, "defaultContainer");
 
-        if(getPlayerId == null || getPlayerHandle == null || getWorldHandle == null || getWorldData == null || getDimensionManager == null || getWorldType == null || getHeadRotation == null || getDataWatcher == null || updateAbilities == null || triggerHealthUpdate == null
-            || updateInventory == null || getScoreboardHandle == null || getTeam == null || asNMSCopy == null || playerRespawnConstructor == null || playerInfoConstructor == null || infoDataConstructor == null || chatComponentConstructor == null || entityDestroyConstructor == null
-            || scoreboardConstructor == null || entityEquipmentConstructor == null || action == null || list == null || ids == null || getWorldProvider == null || defaultContainer == null) {
+        defaultContainer = ReflectionUtil.getField(entityHuman, "defaultContainer");
+        dimensionKey = ReflectionUtil.getField(world, "dimensionKey");
+        typeKey = ReflectionUtil.getField(world, "typeKey");
+
+        if(getPlayerId == null || getPlayerHandle == null || getHeadRotation == null || getDataWatcher == null || updateAbilities == null || triggerHealthUpdate == null
+            || updateInventory == null || getScoreboardHandle == null || getTeam == null || asNMSCopy == null || playerInfoConstructor == null || infoDataConstructor == null || chatComponentConstructor == null || entityDestroyConstructor == null
+            || scoreboardConstructor == null || entityEquipmentConstructor == null || action == null || list == null || ids == null || defaultContainer == null) {
             return;
         }
 
@@ -247,34 +236,27 @@ public class Updater_Other implements Updater {
         }
 
         Object cw = ReflectionUtil.castTo(w, craftWorld);
-        Object wserver = ReflectionUtil.castTo(ReflectionUtil.callMethod(cw, getWorldHandle), worldServer);
-        Object wprovider = ReflectionUtil.getFieldValue(wserver, getWorldProvider);
-        Object wdata = ReflectionUtil.callMethod(wserver, getWorldData);
+        Object wserver = ReflectionUtil.callMethod(cw, getWorldHandle);
 
-        if(ReflectionUtil.getMajorVersion() >= 15) {
-            long hash = 0L;
+        Object mKey = ReflectionUtil.getFieldValue(wserver, typeKey);
+        Object wKey = ReflectionUtil.getFieldValue(wserver, dimensionKey);
 
-            try {
-                MessageDigest d = MessageDigest.getInstance("SHA-256");
-                byte[] enc = d.digest((""+w.getSeed()).getBytes(StandardCharsets.UTF_8));
-                for(int i = 0 ; i < 8 ; i++) {
-                    hash = (hash << 8) + (enc[i] & 0xff);
-                }
-            } catch(NoSuchAlgorithmException ex) {
-                ex.printStackTrace();
+        long hash = 0L;
+
+        try {
+            MessageDigest d = MessageDigest.getInstance("SHA-256");
+            byte[] enc = d.digest((""+w.getSeed()).getBytes(StandardCharsets.UTF_8));
+            for(int i = 0 ; i < 8 ; i++) {
+                hash = (hash << 8) + (enc[i] & 0xff);
             }
-            PacketUtil.sendPacket(p, playerRespawnConstructor, ReflectionUtil.callMethod(wprovider, getDimensionManager), hash, ReflectionUtil.callMethod(wdata, getWorldType), ReflectionUtil.getEnumValue(enumGamemode, p.getGameMode().name()));
-        } else if(ReflectionUtil.getMajorVersion() == 14 ) {
-            PacketUtil.sendPacket(p, playerRespawnConstructor, ReflectionUtil.callMethod(wprovider, getDimensionManager), ReflectionUtil.callMethod(wdata, getWorldType), ReflectionUtil.getEnumValue(enumGamemode, p.getGameMode().name()));
-        } else if(ReflectionUtil.getMajorVersion() == 13) {
-            PacketUtil.sendPacket(p, playerRespawnConstructor, ReflectionUtil.callMethod(wprovider, getDimensionManager), ReflectionUtil.getEnumValue(enumDifficulty, w.getDifficulty().name()), ReflectionUtil.callMethod(wdata, getWorldType), ReflectionUtil.getEnumValue(enumGamemode, p.getGameMode().name()));
-        } else {
-            int type = 0;
-            if(w.getEnvironment() == World.Environment.NETHER) type = 1;
-            if(w.getEnvironment() == World.Environment.THE_END) type = 2;
-
-            PacketUtil.sendPacket(p, playerRespawnConstructor, type, ReflectionUtil.getEnumValue(enumDifficulty, w.getDifficulty().name()), ReflectionUtil.callMethod(wdata, getWorldType), ReflectionUtil.getEnumValue(enumGamemode, p.getGameMode().name()));
+        } catch(NoSuchAlgorithmException ex) {
+            ex.printStackTrace();
         }
+
+        Object mode = ReflectionUtil.getEnumValue(enumGamemode, p.getGameMode().name());
+
+        PacketUtil.sendPacket(p, playerRespawnConstructor, mKey, wKey, hash, mode, mode, false, false, true);
+
         PacketUtil.sendPacket(p, ReflectionUtil.getConstructor(positionPacket, double.class, double.class, double.class, float.class, float.class, Set.class, int.class), p.getLocation().getX(), p.getLocation().getY(), p.getLocation().getZ(), p.getLocation().getYaw(), p.getLocation().getPitch(), new HashSet<>(), 0);
         PacketUtil.sendPacket(p, ReflectionUtil.getConstructor(heldItemPacket, int.class), p.getInventory().getHeldItemSlot());
         PacketUtil.sendPacket(p, ReflectionUtil.getConstructor(entityMetaPacket, int.class, dataWatcher, boolean.class), id, ReflectionUtil.callMethod(ep, getDataWatcher), true);
@@ -363,11 +345,14 @@ public class Updater_Other implements Updater {
             }
         }
 
-        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, ReflectionUtil.getEnumValue(enumItemSlot, "MAINHAND"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getItemInMainHand()));
-        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, ReflectionUtil.getEnumValue(enumItemSlot, "OFFHAND"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getItemInOffHand()));
-        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, ReflectionUtil.getEnumValue(enumItemSlot, "FEET"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getBoots()));
-        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, ReflectionUtil.getEnumValue(enumItemSlot, "LEGS"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getLeggings()));
-        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, ReflectionUtil.getEnumValue(enumItemSlot, "CHEST"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getChestplate()));
-        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, ReflectionUtil.getEnumValue(enumItemSlot, "HEAD"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getHelmet()));
+        List<Pair<Object, Object>> items = new ArrayList<>();
+        items.add(new Pair<>(ReflectionUtil.getEnumValue(enumItemSlot, "MAINHAND"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getItemInMainHand())));
+        items.add(new Pair<>(ReflectionUtil.getEnumValue(enumItemSlot, "OFFHAND"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getItemInOffHand())));
+        items.add(new Pair<>(ReflectionUtil.getEnumValue(enumItemSlot, "FEET"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getBoots())));
+        items.add(new Pair<>(ReflectionUtil.getEnumValue(enumItemSlot, "LEGS"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getLeggings())));
+        items.add(new Pair<>(ReflectionUtil.getEnumValue(enumItemSlot, "CHEST"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getChestplate())));
+        items.add(new Pair<>(ReflectionUtil.getEnumValue(enumItemSlot, "HEAD"), ReflectionUtil.callMethod(craftItemStack, asNMSCopy, p.getInventory().getHelmet())));
+
+        PacketUtil.sendPacket(o, entityEquipmentConstructor, id, items);
     }
 }

@@ -1,39 +1,11 @@
+# This Library is Outdated!
+*This library is no longer maintained and has been superceded by MidnightCore: https://github.com/M1dnightNinja/MidnightCore*
+
+
+
+
 # MidnightSkins
 A library for Spigot plugins that allows for changing players' skins and names. Supports 1.8 or higher. Tested on 1.15.2
-
-## Installation
-MidnightSkins is hosted on the public Maven repository ```mdmc.ddns.net/maven```. Instructions for installing with 
-Gradle is as follows:
-
-### Gradle
-Add the following to your ```build.gradle``` file:
-```
-repositories {
-    maven {
-        url 'https://mdmc.ddns.net/maven'
-    }
-}
-
-dependencies {
-    compile 'me.m1dnightninja:midnightskins:1.0'
-}
-```
-After that, you need to tell Gradle to copy MidnightSkins into your plugin's jar file. To accomplish this, you need
-to add a new configuration and a new build task. These can be whatever you want, but this overview will use the names
-```jarDependencies``` and ```jarWithDependencies``` for the configuration and the build task, respectively. The code is
-as follows:
-
-```
-configurations {
-    jarDependencies
-    jarDependencies.transitive = false
-}
-
-task jarWithDependencies(type: Jar) {
-    from { configurations.jarDependencies.collect { it.isDirectory() ? it : zipTree(it) } }
-    with jar
-}
-```
 
 ## Usage
 
